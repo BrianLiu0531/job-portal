@@ -1,0 +1,151 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pg_trgm]
+}
+
+enum Role {
+  SEEKER
+  EMPLOYER
+  ADMIN
+}
+
+enum Country {
+  AU
+  NZ
+}
+
+enum WorkType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  CASUAL
+}
+
+enum Workplace {
+  ONSITE
+  HYBRID
+  REMOTE
+}
+
+enum JobStatus {
+  OPEN
+  CLOSED
+}
+
+enum ApplicationStatus {
+  APPLIED
+  REVIEWING
+  INTERVIEW
+  OFFERED
+  REJECTED
+  WITHDRAWN
+}
+
+/// Right-to-work status, a standard screening question in AU/NZ hiring
+enum WorkRights {
+  CITIZEN_PR
+  WORKING_HOLIDAY
+  STUDENT
+  TEMPORARY_VISA
+  REQUIRES_SPONSORSHIP
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  name          String
+  passwordHash  String
+  role          Role
+  suspended     Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+  company       Company?
+  seekerProfile SeekerProfile?
+  applications  Application[]
+  savedJobs     SavedJob[]
+
+  @@index([role])
+}
+
+model Company {
+  id          String  @id @default(cuid())
+  ownerId     String  @unique
+  owner       User    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name        String
+  website     String?
+  location    String?
+  description String?
+  jobs        Job[]
+
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+model SeekerProfile {
+  userId     String      @id
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  headline   String?
+  location   String?
+  about      String?
+  skills     String[]
+  workRights WorkRights?
+  resumeUrl  String?
+}
+
+model Job {
+  id           String        @id @default(cuid())
+  companyId    String
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  title        String
+  description  String
+  category     String
+  country      Country
+  region       String
+  city         String
+  workType     WorkType
+  workplace    Workplace
+  /// Annual salary in whole dollars of the job's country currency
+  salaryMin    Int?
+  salaryMax    Int?
+  sponsorship  Boolean       @default(false)
+  status       JobStatus     @default(OPEN)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  applications Application[]
+  savedBy      SavedJob[]
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([companyId])
+  @@index([country, region])
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([description(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+model Application {
+  id          String            @id @default(cuid())
+  jobId       String
+  job         Job               @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  seekerId    String
+  seeker      User              @relation(fields: [seekerId], references: [id], onDelete: Cascade)
+  coverLetter String?
+  status      ApplicationStatus @default(APPLIED)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([jobId, seekerId])
+  @@index([seekerId])
+}
+
+model SavedJob {
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, jobId])
+}
