@@ -1,6 +1,6 @@
 # 🧭 Hireloop — Job Board for Australia & New Zealand
 
-![CI](https://github.com/<your-github-username>/job-portal/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/BrianLiu0531/job-portal/actions/workflows/ci.yml/badge.svg)
 
 A full-stack job portal with **three roles** — job seekers, employers and admins — built around how hiring actually works in AU/NZ: **work-rights screening**, **visa sponsorship filters**, state/region locations and salary ranges quoted the local way.
 
