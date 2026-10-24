@@ -29,9 +29,10 @@ export function useAuth() {
     retry: false,
   });
 
-  // A new session changes per-user data such as "saved" and "applied" flags
-  async function startSession(user: User) {
-    queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== 'meta' });
+  // A new session changes per-user data such as "saved" and "applied" flags. Keep the
+  // "me" query itself: removing it would detach mounted useAuth() observers.
+  async function startSession(user: User | null) {
+    queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== 'meta' && q.queryKey[0] !== ME_KEY[0] });
     queryClient.setQueryData(ME_KEY, user);
   }
 
@@ -50,8 +51,7 @@ export function useAuth() {
     },
     async logout() {
       await api('/auth/logout', { method: 'POST' });
-      queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== 'meta' });
-      queryClient.setQueryData(ME_KEY, null);
+      await startSession(null);
     },
     refresh: () => queryClient.invalidateQueries({ queryKey: ME_KEY }),
   };
