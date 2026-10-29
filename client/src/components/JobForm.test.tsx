@@ -24,6 +24,7 @@ const meta: Meta = {
     REJECTED: 'Unsuccessful',
     WITHDRAWN: 'Withdrawn',
   },
+  features: { aiMatching: false },
 };
 
 function setup() {

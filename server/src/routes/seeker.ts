@@ -127,7 +127,7 @@ seekerRouter.post('/jobs/:id/match', async (req, res) => {
 
   const analyzer = getAnalyzer(env.ANTHROPIC_API_KEY, env.MATCH_MODEL);
   if (!analyzer) {
-    res.json({ ...fallback('AI matching isn’t configured on this server, so this is a keyword match.'), cached: false });
+    res.json({ ...fallback('AI analysis uses a paid API and is switched off on this demo, so this is a free keyword match.'), cached: false });
     return;
   }
 

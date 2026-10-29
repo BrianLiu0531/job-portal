@@ -118,6 +118,7 @@ profile + listing ─┬─► eligibility rules in code ───────�
 - **Always answers.** Without `ANTHROPIC_API_KEY`, over a limit, or when the API fails, the endpoint returns a keyword match that says why. Failed calls aren't cached or counted.
 - **Privacy.** The pasted résumé is used for matching only and is excluded from what employers receive with an application.
 - **Model:** `claude-opus-5-5` by default (`MATCH_MODEL`), with server-side refusal fallback (`fallbacks: "default"`).
+- **The live demo runs without an API key** to stay free, so it shows keyword matching and says so next to the button. Set `ANTHROPIC_API_KEY` to turn on the AI analysis.
 
 Tests use a fake analyzer and a fake SDK client, so CI never calls the API. They cover caching, cache invalidation on edit, concurrent requests, each fallback path, limits, roles, and every malformed-response case.
 

@@ -328,7 +328,8 @@ describe('job matching', () => {
     setAnalyzer(null);
     const noKey = await seeker.post(`/api/seeker/jobs/${job.id}/match`).expect(200);
     expect(noKey.body).toMatchObject({ source: 'keyword', matchedSkills: ['React', 'TypeScript'], score: 100 });
-    expect(noKey.body.notice).toMatch(/isn’t configured/);
+    expect(noKey.body.notice).toMatch(/switched off/);
+    expect((await request(app).get('/api/meta').expect(200)).body.features).toEqual({ aiMatching: false });
 
     fakeAnalyzer(async () => {
       throw new AnalysisUnavailableError('declined');

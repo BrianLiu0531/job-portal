@@ -22,6 +22,7 @@ export interface Meta {
   workplaces: Record<Workplace, string>;
   workRights: Record<WorkRights, string>;
   applicationStatuses: Record<ApplicationStatus, string>;
+  features: { aiMatching: boolean };
 }
 
 export interface JobInput {

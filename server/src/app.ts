@@ -15,6 +15,7 @@ import {
   WORKPLACES,
 } from './lib/constants.js';
 import { errorHandler } from './lib/http.js';
+import { getAnalyzer } from './lib/match.js';
 import { optionalAuth, requireRole } from './middleware/auth.js';
 import { adminRouter } from './routes/admin.js';
 import { authRouter } from './routes/auth.js';
@@ -45,6 +46,8 @@ export function createApp() {
       workplaces: WORKPLACES,
       workRights: WORK_RIGHTS,
       applicationStatuses: APPLICATION_STATUSES,
+      // Lets the UI say up front whether "Check my fit" uses Claude or the free keyword matcher
+      features: { aiMatching: getAnalyzer(env.ANTHROPIC_API_KEY, env.MATCH_MODEL) !== null },
     });
   });
   app.use('/api/auth', authRouter);
