@@ -42,6 +42,7 @@ export const seekerProfileSchema = z.object({
   skills: z.array(z.string().trim().min(1).max(40)).max(20).default([]),
   workRights: z.nativeEnum(WorkRights).nullish().transform((v) => v ?? null),
   resumeUrl: optionalUrl,
+  resumeText: optionalText(15_000),
 });
 
 export const companySchema = z.object({

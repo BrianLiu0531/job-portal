@@ -68,6 +68,7 @@ model User {
   seekerProfile SeekerProfile?
   applications  Application[]
   savedJobs     SavedJob[]
+  jobMatches    JobMatch[]
 
   @@index([role])
 }
@@ -94,6 +95,8 @@ model SeekerProfile {
   skills     String[]
   workRights WorkRights?
   resumeUrl  String?
+  /// Plain-text résumé, used for job matching
+  resumeText String?
 }
 
 model Job {
@@ -117,6 +120,7 @@ model Job {
   updatedAt    DateTime      @updatedAt
   applications Application[]
   savedBy      SavedJob[]
+  matches      JobMatch[]
 
   @@index([status, createdAt(sort: Desc)])
   @@index([companyId])
@@ -148,4 +152,22 @@ model SavedJob {
   createdAt DateTime @default(now())
 
   @@id([userId, jobId])
+}
+
+/// A cached AI fit analysis. inputHash covers the profile, the job and the model,
+/// so the same question is never paid for twice and any edit produces a fresh analysis.
+model JobMatch {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  inputHash String
+  model     String
+  result    Json
+  createdAt DateTime @default(now())
+
+  @@unique([userId, jobId, inputHash])
+  @@index([createdAt])
+  @@index([userId, createdAt])
 }

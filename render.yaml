@@ -15,3 +15,6 @@ services:
       # Neon connection string (direct, not pooled); you are asked for it when the Blueprint is created
       - key: DATABASE_URL
         sync: false
+      # Optional: enables AI job matching (keyword matching without it)
+      - key: ANTHROPIC_API_KEY
+        sync: false

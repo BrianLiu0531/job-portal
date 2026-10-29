@@ -215,3 +215,19 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); o
   .table td { border: 0; padding: 0; }
   .table td.actions { text-align: left; padding-top: 0.4rem; }
 }
+
+/* Fit check */
+.fit-header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.fit-header h2 { margin: 0; }
+.fit-score { display: flex; gap: 0.9rem; align-items: center; }
+.fit-number { flex: none; display: grid; place-items: center; width: 3.4rem; height: 3.4rem; border-radius: 50%; font-size: 1.25rem; font-weight: 700; border: 3px solid currentColor; }
+.fit-strong { color: var(--success); }
+.fit-partial { color: var(--accent); }
+.fit-weak { color: var(--danger); }
+.fit-summary { margin: 0 0 0.2rem; }
+.fit-heading { margin: 0 0 0.35rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.fit-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.fit-list { margin: 0; padding-left: 1.1rem; font-size: 0.9rem; display: grid; gap: 0.3rem; }
+.fit-eligibility { padding: 0.5rem 0.75rem; border-radius: 8px; background: #fef3c7; color: #92400e; }
+.fit-eligibility p { margin: 0.15rem 0; }
+.tag-missing { border-style: dashed; }

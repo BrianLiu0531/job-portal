@@ -29,6 +29,7 @@ Or use the one-click demo buttons on the login page.
 - Track every application through a visual pipeline (Applied → Under review → Interview → Offered) and withdraw if plans change
 - Save jobs for later
 - Profile with headline, skills, résumé link and **right-to-work status** (citizen/PR, working holiday, student visa, requires sponsorship…)
+- **Check my fit**: compares your profile and pasted résumé with a listing using Claude, and shows a score, matched and missing skills, strengths, gaps and cover-letter tips (see [AI job matching](#ai-job-matching))
 
 ### Employers
 - Company profile shown on every listing
@@ -93,6 +94,33 @@ stateDiagram-v2
 - **`/api/meta` is the single source of truth** for categories, regions and labels, so the client never drifts from server-side validation.
 - **No admin self-registration** — the register schema is a discriminated union that only accepts `SEEKER` or `EMPLOYER`.
 
+## AI job matching
+
+`POST /api/seeker/jobs/:id/match` ([`server/src/lib/match.ts`](server/src/lib/match.ts), [`routes/seeker.ts`](server/src/routes/seeker.ts))
+
+```
+profile + listing ─┬─► eligibility rules in code ─────────────────────────────┐
+                   └─► cache hit? ─yes──────────────────────────────────────►├─► response
+                         │ no                                                 │
+                         ▼                                                    │
+                    within daily limits? ─no─► keyword match ───────────────►│
+                         │ yes                                                │
+                         ▼                                                    │
+                    Claude (JSON schema) ─fails─► keyword match ────────────►│
+                         │ ok: validate, clamp, cache                         │
+                         └──────────────────────────────────────────────────►┘
+```
+
+- **Code decides the facts, the model decides the judgement calls.** Work rights against sponsorship, student and working-holiday visa limits, and on-site location are checked in code. The model never sees work rights or the sponsorship flag, so it can't reason about eligibility, and a listing can't argue its way past the rules.
+- **Structured output, validated twice.** The request uses a JSON schema (`output_config.format`), and the response is parsed again with Zod. The score is clamped to 0–100, and lists are trimmed. A refusal, truncated output, invalid JSON, or the wrong shape all become a clean fallback, never a 500.
+- **Prompt-injection aware.** Both the profile and the listing are user-written. They are passed as JSON inside tagged blocks, with an instruction to treat them only as data. The blast radius is small anyway: the result is advice shown to the seeker, and nothing acts on it.
+- **Cost control.** Results are cached by a SHA-256 hash of the profile, the listing and the model. Asking again is free, and editing either side produces a fresh analysis. Simultaneous identical requests (a double click) share one API call. There are daily limits per seeker (`MATCH_USER_DAILY_LIMIT`, default 10) and for the whole site (`MATCH_SITE_DAILY_LIMIT`, default 200), with low effort, a 45 s timeout and one retry.
+- **Always answers.** Without `ANTHROPIC_API_KEY`, over a limit, or when the API fails, the endpoint returns a keyword match that says why. Failed calls aren't cached or counted.
+- **Privacy.** The pasted résumé is used for matching only and is excluded from what employers receive with an application.
+- **Model:** `claude-opus-5-5` by default (`MATCH_MODEL`), with server-side refusal fallback (`fallbacks: "default"`).
+
+Tests use a fake analyzer and a fake SDK client, so CI never calls the API. They cover caching, cache invalidation on edit, concurrent requests, each fallback path, limits, roles, and every malformed-response case.
+
 ## Getting started
 
 Prerequisites: Node.js 20+, Docker Desktop
@@ -113,7 +141,7 @@ npm test          # server unit + integration, client component tests
 npm run typecheck
 ```
 
-The integration suite (`server/tests/integration`) covers role-based access, search filters and sorting, pagination, closed-job visibility, cross-company isolation, the full hiring workflow including invalid transitions, saved jobs, and admin suspension/moderation.
+The integration suite (`server/tests/integration`) covers role-based access, search filters and sorting, pagination, closed-job visibility, cross-company isolation, the full hiring workflow including invalid transitions, saved jobs, admin suspension/moderation, and AI job matching (caching, concurrency, limits and fallbacks).
 
 ## API overview
 
@@ -121,7 +149,7 @@ The integration suite (`server/tests/integration`) covers role-based access, sea
 |---|---|
 | Auth | `POST /api/auth/register` · `POST /api/auth/login` · `POST /api/auth/logout` · `GET /api/auth/me` |
 | Public | `GET /api/jobs` (filters: `q`, `country`, `region`, `category`, `workType`, `workplace`, `minSalary`, `sponsorship`, `sort`, `page`) · `GET /api/jobs/:id` · `GET /api/meta` |
-| Seeker | `POST /api/jobs/:id/apply` · `PUT/DELETE /api/jobs/:id/save` · `GET/PUT /api/seeker/profile` · `GET /api/seeker/applications` · `POST /api/seeker/applications/:id/withdraw` · `GET /api/seeker/saved` |
+| Seeker | `POST /api/jobs/:id/apply` · `PUT/DELETE /api/jobs/:id/save` · `GET/PUT /api/seeker/profile` · `POST /api/seeker/jobs/:id/match` · `GET /api/seeker/applications` · `POST /api/seeker/applications/:id/withdraw` · `GET /api/seeker/saved` |
 | Employer | `GET/PUT /api/employer/company` · `GET/POST /api/employer/jobs` · `GET/PUT /api/employer/jobs/:id` · `PATCH /api/employer/jobs/:id/status` · `GET /api/employer/jobs/:id/applications` · `PATCH /api/employer/applications/:id` |
 | Admin | `GET /api/admin/stats` · `GET /api/admin/users` · `PATCH /api/admin/users/:id` · `GET /api/admin/jobs` · `PATCH /api/admin/jobs/:id` |
 
@@ -131,7 +159,7 @@ One Docker image serves both the API and the built React app, and runs migration
 
 1. Create a PostgreSQL database (e.g. [Neon](https://neon.tech) free tier). `pg_trgm` is available on Neon and most managed Postgres services.
 2. On [Render](https://render.com), choose **New → Blueprint** and pick this repo; [`render.yaml`](render.yaml) sets up a free Docker web service and generates `JWT_SECRET`.
-3. Set `DATABASE_URL`, `JWT_SECRET` (long random string) and `NODE_ENV=production`.
+3. Set `DATABASE_URL`, `JWT_SECRET` (long random string) and `NODE_ENV=production`. Optionally set `ANTHROPIC_API_KEY` to turn on AI matching; without it, matching uses keywords.
 4. Run `npx prisma db seed` once for the demo accounts.
 
 ## Roadmap

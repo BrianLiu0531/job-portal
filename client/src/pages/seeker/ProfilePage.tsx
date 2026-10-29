@@ -11,7 +11,7 @@ export default function ProfilePage() {
   const { data: meta } = useMeta();
   const { data: profile } = useQuery({ queryKey: ['profile'], queryFn: () => api<SeekerProfile>('/seeker/profile') });
 
-  const [form, setForm] = useState({ name: '', headline: '', location: '', about: '', skills: '', workRights: '', resumeUrl: '' });
+  const [form, setForm] = useState({ name: '', headline: '', location: '', about: '', skills: '', workRights: '', resumeUrl: '', resumeText: '' });
   useEffect(() => {
     if (!profile) return;
     setForm({
@@ -22,6 +22,7 @@ export default function ProfilePage() {
       skills: profile.skills.join(', '),
       workRights: profile.workRights ?? '',
       resumeUrl: profile.resumeUrl ?? '',
+      resumeText: profile.resumeText ?? '',
     });
   }, [profile]);
 
@@ -97,6 +98,17 @@ export default function ProfilePage() {
         <label className="field">
           <span>About you</span>
           <textarea rows={5} maxLength={2000} value={form.about} onChange={set('about')} />
+        </label>
+        <label className="field">
+          <span>Résumé text (private)</span>
+          <textarea
+            rows={8}
+            maxLength={15000}
+            value={form.resumeText}
+            placeholder="Paste your résumé as plain text"
+            onChange={set('resumeText')}
+          />
+          <small className="muted">Only used for “Check my fit” on job listings. Employers don’t see it.</small>
         </label>
         {save.error && <p className="error" role="alert">{errorMessage(save.error)}</p>}
         {save.isSuccess && <p className="success" role="status">Profile saved</p>}

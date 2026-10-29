@@ -66,6 +66,25 @@ function describeJob(job: JobSeed, company: (typeof companies)[number]) {
 
 const hash = (pw: string) => bcrypt.hash(pw, 12);
 
+/** The demo seeker's résumé, so "Check my fit" has something real to compare */
+export const DEMO_RESUME = `Alex Chen, Sydney NSW, junior full stack developer
+
+Experience
+Junior Developer, Bright Pixel Studio (Taipei), 2024 to 2026
+- Built customer dashboards in React and TypeScript used by 3,000 monthly users
+- Wrote REST APIs in Node.js and Express backed by PostgreSQL, with Jest tests
+- Cut page load time by 40% by code-splitting and caching API responses
+
+Projects
+- Recipe planner: React, React Query and a Node.js API, deployed on Render
+- Accessibility audit of a council website (WCAG 2.1 AA), fixing 30 issues
+
+Education
+Bachelor of Information Management, 2024
+
+Skills
+React, TypeScript, JavaScript, Node.js, Express, PostgreSQL, Git, Jest, HTML, CSS, accessibility`;
+
 async function main() {
   await prisma.user.deleteMany();
 
@@ -101,7 +120,7 @@ async function main() {
   });
 
   const seekerSeeds = [
-    { name: 'Alex Chen', email: DEMO_ACCOUNTS.seeker.email, headline: 'Junior full stack developer · React & Node.js', location: 'Sydney, NSW', workRights: 'WORKING_HOLIDAY' as const, skills: ['React', 'TypeScript', 'Node.js', 'PostgreSQL'] },
+    { name: 'Alex Chen', email: DEMO_ACCOUNTS.seeker.email, headline: 'Junior full stack developer · React & Node.js', location: 'Sydney, NSW', workRights: 'WORKING_HOLIDAY' as const, skills: ['React', 'TypeScript', 'Node.js', 'PostgreSQL'], resumeText: DEMO_RESUME },
     { name: 'Mia Thompson', email: 'mia@example.com', headline: 'Registered nurse with 4 years of community care', location: 'Melbourne, VIC', workRights: 'CITIZEN_PR' as const, skills: ['Patient care', 'Medication management'] },
     { name: 'Tama Ngata', email: 'tama@example.com', headline: 'Backend engineer who loves payments', location: 'Auckland', workRights: 'CITIZEN_PR' as const, skills: ['Node.js', 'Go', 'AWS'] },
     { name: 'Priya Sharma', email: 'priya@example.com', headline: 'Data analyst · SQL, Python, Power BI', location: 'Brisbane, QLD', workRights: 'STUDENT' as const, skills: ['SQL', 'Python', 'Power BI'] },

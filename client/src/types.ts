@@ -84,6 +84,24 @@ export interface SeekerProfileFields {
 export interface SeekerProfile extends SeekerProfileFields {
   name: string;
   email: string;
+  /** Private: used for job matching, never shown to employers */
+  resumeText: string | null;
+}
+
+export interface JobMatch {
+  score: number;
+  summary: string;
+  matchedSkills: string[];
+  missingSkills: string[];
+  strengths: string[];
+  gaps: string[];
+  coverLetterTips: string[];
+  source: 'ai' | 'keyword';
+  model: string | null;
+  eligibility: string[];
+  notice?: string;
+  cached: boolean;
+  remainingToday?: number;
 }
 
 export interface Applicant {

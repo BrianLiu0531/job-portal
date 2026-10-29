@@ -85,7 +85,7 @@ employerRouter.get('/jobs/:id/applications', async (req, res) => {
     where: { jobId: job.id, status },
     orderBy: { createdAt: 'asc' },
     include: {
-      seeker: { select: { id: true, name: true, email: true, seekerProfile: { omit: { userId: true } } } },
+      seeker: { select: { id: true, name: true, email: true, seekerProfile: { omit: { userId: true, resumeText: true } } } },
     },
   });
   res.json({

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import FitCheck from '../components/FitCheck';
 import Modal from '../components/Modal';
 import SaveButton from '../components/SaveButton';
 import StatusBadge from '../components/StatusBadge';
@@ -112,6 +113,8 @@ export default function JobDetailPage() {
           )}
         </div>
 
+        {user?.role === 'SEEKER' && job.status === 'OPEN' && <FitCheck key={job.id} jobId={job.id} />}
+
         <div className="card stack">
           <h2>About {job.company.name}</h2>
           {job.company.location && <p className="muted small">📍 {job.company.location}</p>}
@@ -134,7 +137,7 @@ export default function JobDetailPage() {
             }}
           >
             <p className="muted small">
-              Your profile (headline, skills, work rights and résumé link) is shared with {job.company.name}.{' '}
+              Your profile (headline, skills, work rights and résumé link, but not your pasted résumé text) is shared with {job.company.name}.{' '}
               <Link to="/me/profile">Review profile</Link>
             </p>
             <label className="field">

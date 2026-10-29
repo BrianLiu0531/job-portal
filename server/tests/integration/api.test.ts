@@ -1,8 +1,10 @@
 import bcrypt from 'bcryptjs';
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../src/app.js';
 import { prisma } from '../../src/db.js';
+import { env } from '../../src/env.js';
+import { AnalysisUnavailableError, setAnalyzer, type Analyzer, type MatchAnalysis } from '../../src/lib/match.js';
 
 const app = createApp();
 const PASSWORD = 'password123';
@@ -254,5 +256,120 @@ describe('admin', () => {
     await admin.patch(`/api/admin/jobs/${job.id}`).send({ status: 'CLOSED' }).expect(200);
     const search = await request(app).get('/api/jobs?q=crypto').expect(200);
     expect(search.body.total).toBe(0);
+  });
+});
+
+describe('job matching', () => {
+  const analysis: MatchAnalysis = {
+    score: 72,
+    summary: 'You cover the core stack.',
+    matchedSkills: ['React', 'TypeScript'],
+    missingSkills: ['GraphQL'],
+    strengths: ['Two React projects'],
+    gaps: ['No GraphQL'],
+    coverLetterTips: ['Mention your accessibility work'],
+  };
+  function fakeAnalyzer(impl: () => Promise<MatchAnalysis> = async () => analysis) {
+    const analyzer: Analyzer = { model: 'test-model', analyze: vi.fn(impl) };
+    setAnalyzer(analyzer);
+    return analyzer;
+  }
+  async function seekerWithProfile(profile: Record<string, unknown> = {}) {
+    const seeker = await signUp('SEEKER');
+    await seeker
+      .put('/api/seeker/profile')
+      .send({ name: 'Sam', skills: ['React', 'TypeScript'], workRights: 'REQUIRES_SPONSORSHIP', resumeText: 'Built two React apps.', ...profile })
+      .expect(200);
+    return seeker;
+  }
+
+  afterEach(() => setAnalyzer(undefined));
+
+  it('returns the AI analysis with code-checked eligibility, and caches identical requests', async () => {
+    const analyzer = fakeAnalyzer();
+    const job = await postJob(await signUp('EMPLOYER'));
+    const seeker = await seekerWithProfile();
+
+    const first = await seeker.post(`/api/seeker/jobs/${job.id}/match`).expect(200);
+    expect(first.body).toMatchObject({ ...analysis, source: 'ai', model: 'test-model', cached: false });
+    // The job doesn't sponsor visas: decided by code, not by the model
+    expect(first.body.eligibility).toEqual([expect.stringContaining('sponsorship')]);
+
+    const again = await seeker.post(`/api/seeker/jobs/${job.id}/match`).expect(200);
+    expect(again.body).toMatchObject({ score: 72, cached: true });
+    expect(analyzer.analyze).toHaveBeenCalledTimes(1);
+
+    // Editing the profile makes it a new question
+    await seeker.put('/api/seeker/profile').send({ name: 'Sam', skills: ['React', 'TypeScript', 'GraphQL'] }).expect(200);
+    await seeker.post(`/api/seeker/jobs/${job.id}/match`).expect(200);
+    expect(analyzer.analyze).toHaveBeenCalledTimes(2);
+  });
+
+  it('shares one API call between concurrent identical requests', async () => {
+    let release!: () => void;
+    const analyzer = fakeAnalyzer(() => new Promise((r) => (release = () => r(analysis))));
+    const job = await postJob(await signUp('EMPLOYER'));
+    const seeker = await seekerWithProfile();
+
+    const both = Promise.all([seeker.post(`/api/seeker/jobs/${job.id}/match`), seeker.post(`/api/seeker/jobs/${job.id}/match`)]);
+    await vi.waitFor(() => expect(analyzer.analyze).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 100)); // give the second request time to arrive
+    release();
+    const [a, b] = await both;
+    expect([a.status, b.status]).toEqual([200, 200]);
+    expect(analyzer.analyze).toHaveBeenCalledTimes(1);
+    expect(await prisma.jobMatch.count({ where: { jobId: job.id } })).toBe(1);
+  });
+
+  it('falls back to keyword matching without an API key, over the daily limit, or when the API fails', async () => {
+    const job = await postJob(await signUp('EMPLOYER'));
+    const seeker = await seekerWithProfile();
+
+    setAnalyzer(null);
+    const noKey = await seeker.post(`/api/seeker/jobs/${job.id}/match`).expect(200);
+    expect(noKey.body).toMatchObject({ source: 'keyword', matchedSkills: ['React', 'TypeScript'], score: 100 });
+    expect(noKey.body.notice).toMatch(/isn’t configured/);
+
+    fakeAnalyzer(async () => {
+      throw new AnalysisUnavailableError('declined');
+    });
+    const failed = await seeker.post(`/api/seeker/jobs/${job.id}/match`).expect(200);
+    expect(failed.body).toMatchObject({ source: 'keyword' });
+    expect(failed.body.notice).toMatch(/unavailable/);
+    expect(await prisma.jobMatch.count({ where: { jobId: job.id } })).toBe(0); // failures aren't cached or counted
+
+    const limit = env.MATCH_USER_DAILY_LIMIT;
+    env.MATCH_USER_DAILY_LIMIT = 1;
+    try {
+      const analyzer = fakeAnalyzer();
+      const other = await postJob(await signUp('EMPLOYER'));
+      await seeker.post(`/api/seeker/jobs/${job.id}/match`).expect(200);
+      const over = await seeker.post(`/api/seeker/jobs/${other.id}/match`).expect(200);
+      expect(over.body.source).toBe('keyword');
+      expect(over.body.notice).toMatch(/today’s 1 AI analyses/);
+      // An analysis the seeker already has is still served from the cache
+      const cached = await seeker.post(`/api/seeker/jobs/${job.id}/match`).expect(200);
+      expect(cached.body).toMatchObject({ source: 'ai', cached: true });
+      expect(analyzer.analyze).toHaveBeenCalledTimes(1);
+    } finally {
+      env.MATCH_USER_DAILY_LIMIT = limit;
+    }
+  });
+
+  it('needs a profile, an open job and the seeker role, and keeps the résumé text from employers', async () => {
+    fakeAnalyzer();
+    const employer = await signUp('EMPLOYER');
+    const job = await postJob(employer);
+    const empty = await signUp('SEEKER');
+    const res = await empty.post(`/api/seeker/jobs/${job.id}/match`).expect(400);
+    expect(res.body.error).toMatch(/profile/);
+    await employer.post(`/api/seeker/jobs/${job.id}/match`).expect(403);
+
+    const seeker = await seekerWithProfile();
+    await seeker.post('/api/seeker/jobs/nope/match').expect(404);
+    await seeker.post(`/api/jobs/${job.id}/apply`).send({}).expect(201);
+    const list = await employer.get(`/api/employer/jobs/${job.id}/applications`).expect(200);
+    expect(list.body.applications[0].seeker.seekerProfile.skills).toEqual(['React', 'TypeScript']);
+    expect(list.body.applications[0].seeker.seekerProfile).not.toHaveProperty('resumeText');
   });
 });
